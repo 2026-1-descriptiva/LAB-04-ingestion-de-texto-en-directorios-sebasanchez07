@@ -1,9 +1,10 @@
-# pylint: disable=import-outside-toplevel
-# pylint: disable=line-too-long
-# flake8: noqa
 """
 Escriba el codigo que ejecute la accion solicitada en cada pregunta.
 """
+
+# pylint: disable=import-outside-toplevel
+# pylint: disable=line-too-long
+# flake8: noqa
 
 
 def pregunta_01():
@@ -69,5 +70,53 @@ def pregunta_01():
     |  4 | Tampere Science Parks is a Finnish company that owns , leases and builds office properties and it specialises in facilities for technology-oriented businesses         | neutral  |
     ```
 
-
     """
+    import os
+    import zipfile
+    import pandas as pd
+
+    # 1) DESCOMPRIMIR el ZIP si aún no se ha extraído
+    #    El ZIP ya contiene la carpeta "input/" adentro, así que extraemos
+    #    a la RAÍZ del proyecto (no a "input") para que quede input/train/...
+    zip_path = "files/input.zip"
+    if not os.path.isdir("input/train/positive"):
+        with zipfile.ZipFile(zip_path, "r") as z:
+            z.extractall(".")
+
+    # 2) Crear la carpeta de salida files/output/
+    os.makedirs("files/output", exist_ok=True)
+
+    # 3) Para cada split (train y test), recorrer las carpetas de sentiment
+    #    y armar un DataFrame con (phrase, target)
+    resultados = {}
+    for split in ["train", "test"]:
+        filas = []
+        split_dir = os.path.join("input", split)
+
+        # Recorremos las 3 carpetas de sentiment en un orden estable
+        for sentiment in ["negative", "positive", "neutral"]:
+            sentiment_dir = os.path.join(split_dir, sentiment)
+
+            # Si la carpeta no existe (puede pasar si el ZIP tiene otra estructura), la saltamos
+            if not os.path.isdir(sentiment_dir):
+                continue
+
+            # Listamos los archivos .txt ordenados alfabéticamente
+            for filename in sorted(os.listdir(sentiment_dir)):
+                if not filename.endswith(".txt"):
+                    continue
+
+                # Leemos el contenido del archivo y le quitamos espacios/saltos al borde
+                filepath = os.path.join(sentiment_dir, filename)
+                with open(filepath, "r", encoding="utf-8") as f:
+                    phrase = f.read().strip()
+
+                filas.append({"phrase": phrase, "target": sentiment})
+
+        # Construimos el DataFrame y lo guardamos como CSV
+        df = pd.DataFrame(filas)
+        output_path = os.path.join("files", "output", f"{split}_dataset.csv")
+        df.to_csv(output_path, index=False)
+        resultados[split] = df
+
+    return resultados
